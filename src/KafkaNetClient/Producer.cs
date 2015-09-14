@@ -91,9 +91,9 @@ namespace KafkaNet
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
 
-            _postTask = Task.Run(() =>
+            _postTask = Task.Run(async () =>
             {
-                BatchSendAsync();
+                await BatchSendAsync();
                 //TODO add log for ending the sending thread.
             });
         }
@@ -153,9 +153,9 @@ namespace KafkaNet
             return _metadataQueries.GetTopicFromCache(topic);
         }
 
-        public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
+        public async Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
         {
-            return _metadataQueries.GetTopicOffsetAsync(topic, maxOffsets, time);
+            return await _metadataQueries.GetTopicOffsetAsync(topic, maxOffsets, time).ConfigureAwait(false);
         }
 
         /// <summary>

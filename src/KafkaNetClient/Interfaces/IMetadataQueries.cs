@@ -24,6 +24,6 @@ namespace KafkaNet
         /// <param name="maxOffsets"></param>
         /// <param name="time"></param>
         /// <returns></returns>
-        Task<List<KafkaNet.Protocol.OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1);
+        Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1);
     }
 }

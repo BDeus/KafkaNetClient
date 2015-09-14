@@ -141,7 +141,7 @@ namespace KafkaNet
         {
             try
             {
-                await _taskLocker.WaitAsync(timeout);
+                await _taskLocker.WaitAsync(timeout).ConfigureAwait(false);
                 int missingFromCache = SearchCacheForTopics(topics, cacheExpiration).Missing.Count;
                 if (missingFromCache == 0)
                 {
