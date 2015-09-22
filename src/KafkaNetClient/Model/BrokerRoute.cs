@@ -8,7 +8,7 @@
 
         public override string ToString()
         {
-            return string.Format("{0} Topic:{1} PartitionId:{2}", Connection.Endpoint.ServeUri, Topic, PartitionId);
+            return string.Format("{0} Topic:{1} PartitionId:{2}", Connection.Endpoint.ServerUri, Topic, PartitionId);
         }
 
         #region Equals Override...

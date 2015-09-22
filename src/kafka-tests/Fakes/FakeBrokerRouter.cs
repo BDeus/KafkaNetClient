@@ -51,7 +51,7 @@ namespace kafka_tests
                                        .Returns(info => new KafkaEndpoint
                                         {
                                             Endpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), ((Uri)info[0]).Port),
-                                            ServeUri = ((Uri)info[0])
+                                            ServerUri = ((Uri)info[0])
                                         });
         }
 

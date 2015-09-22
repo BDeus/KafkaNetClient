@@ -36,7 +36,7 @@ namespace kafka_tests.Unit
                 .Returns<Uri, IKafkaLog>((uri, log) => new KafkaEndpoint
                 {
                     Endpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), uri.Port),
-                    ServeUri = uri
+                    ServerUri = uri
                 });
         }
 

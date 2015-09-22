@@ -5,7 +5,7 @@ namespace KafkaNet.Model
 {
     public class KafkaEndpoint
     {
-        public Uri ServeUri { get; set; }
+        public Uri ServerUri { get; set; }
         public IPEndPoint Endpoint { get; set; }
 
         protected bool Equals(KafkaEndpoint other)
@@ -29,7 +29,7 @@ namespace KafkaNet.Model
 
         public override string ToString()
         {
-            return ServeUri.ToString();
+            return ServerUri.ToString();
         }
     }
 }

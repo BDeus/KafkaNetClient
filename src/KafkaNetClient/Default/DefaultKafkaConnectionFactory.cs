@@ -21,7 +21,7 @@ namespace KafkaNet
 
             var kafkaEndpoint = new KafkaEndpoint()
             {
-                ServeUri = kafkaAddress,
+                ServerUri = kafkaAddress,
                 Endpoint = ipEndpoint
             };
 
