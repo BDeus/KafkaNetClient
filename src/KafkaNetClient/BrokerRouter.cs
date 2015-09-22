@@ -235,6 +235,8 @@ namespace KafkaNet
 
         private void UpdateInternalMetadataCache(MetadataResponse metadata)
         {
+            RemoveConnectionToBrokerConnectionIndex(metadata.Brokers);
+
             //resolve each broker
             var brokerEndpoints = metadata.Brokers.Select(broker => new
             {
@@ -261,6 +263,22 @@ namespace KafkaNet
             {
                 var localTopic = new Tuple<Topic, DateTime>(topic, DateTime.Now);
                 _topicIndex.AddOrUpdate(topic.Name, s => localTopic, (s, existing) => localTopic);
+            }
+        }
+
+        /// <summary>
+        /// Remove old connection which is not in the parameters brokers list
+        /// </summary>
+        /// <param name="newBrokers"></param>
+        private void RemoveConnectionToBrokerConnectionIndex(IEnumerable<Broker> newBrokers)
+        {
+            var listToRemove = _brokerConnectionIndex.Keys.Except(newBrokers.Select(x => x.BrokerId));
+            foreach (var brokerId in listToRemove)
+            {
+                IKafkaConnection connection;
+                _brokerConnectionIndex.TryRemove(brokerId, out connection);
+                using (connection)
+                { }
             }
         }
 
