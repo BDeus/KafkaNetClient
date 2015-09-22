@@ -103,6 +103,19 @@ namespace kafka_tests.Unit
             Assert.That(collection.Count, Is.EqualTo(9), "There should now be 9 items in the buffer.");
         }
 
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public void TestDrainAnApplyNotInInfiniteLoop()
+        {
+            var aq = new AsyncCollection<bool>();
+
+            aq.Add(true);
+
+            var task = Task.Run(() => aq.DrainAndApply(x => aq.Add(x)));
+
+            Assert.IsTrue(task.Wait(1000));
+        }
+
+
         #region Take Tests...
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]

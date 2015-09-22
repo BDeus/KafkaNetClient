@@ -95,9 +95,12 @@ namespace KafkaNet.Common
 
         public void DrainAndApply(Action<T> appliedFunc)
         {
-            T data;
-            while (_queue.TryDequeue(out data))
+            var nb = _queue.Count;
+            for (int i = 0; i < nb; i++)
             {
+                T data;
+                if (!_queue.TryDequeue(out data))
+                    break;
                 appliedFunc(data);
             }
 
