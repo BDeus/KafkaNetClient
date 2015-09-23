@@ -54,8 +54,8 @@ namespace KafkaNet
         /// Get the last refresh time in UTC
         /// </summary>
         /// <param name="topic"></param>
-        /// <returns></returns>
-        DateTime GetTopicMetadataRefreshTime(string topic);
+        /// <returns>return UTC DateTime of the last Refresh Metadata or null if the topic not exist in cache</returns>
+        DateTime? GetTopicMetadataRefreshTime(string topic);
 
         IKafkaLog Log { get; }
     }

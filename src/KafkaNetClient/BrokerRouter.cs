@@ -119,7 +119,7 @@ namespace KafkaNet
                 throw new InvalidTopicNotExistsInCache(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing)));
             }
 
-            return topicSearchResult.Topics;
+            return topicSearchResult.Found;
         }
 
         /// <summary>
@@ -174,6 +174,12 @@ namespace KafkaNet
             return true;
         }
 
+        /// <summary>
+        /// Search all Found from <paramref name="topics"/> and split in Found and Missing Lists
+        /// </summary>
+        /// <param name="topics"></param>
+        /// <param name="expiration">if expiration is not null put all expired topics in Missing List</param>
+        /// <returns></returns>
         private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration)
         {
             var result = new TopicSearchResult();
@@ -188,13 +194,19 @@ namespace KafkaNet
                 }
                 else
                 {
-                    result.Topics.Add(cachedTopic);
+                    result.Found.Add(cachedTopic);
                 }
             }
 
             return result;
         }
 
+        /// <summary>
+        /// Retrieve Topic from topicIndex cache if it is not expired
+        /// </summary>
+        /// <param name="topic"></param>
+        /// <param name="expiration"></param>
+        /// <returns></returns>
         private Topic GetCachedTopic(string topic, TimeSpan? expiration = null)
         {
             TopicIndex cachedTopic;
@@ -210,6 +222,13 @@ namespace KafkaNet
             return null;
         }
 
+        /// <summary>
+        /// Find BrokerRoute from <paramref name="topic"/> and <paramref name="partition"/>
+        /// </summary>
+        /// <param name="topic"></param>
+        /// <param name="partition"></param>
+        /// <returns></returns>
+        /// <exception cref="LeaderNotFoundException">Throw if the leader of the partition cannot be found</exception>
         private BrokerRoute GetCachedRoute(string topic, Partition partition)
         {
             var route = TryGetRouteFromCache(topic, partition);
@@ -234,16 +253,25 @@ namespace KafkaNet
             return null;
         }
 
-        private void UpdateInternalMetadataCache(MetadataResponse metadata)
+        /// <summary>
+        /// Update the caches metadata dictionaries from <paramref name="metadataResponse"/>
+        /// </summary>
+        /// <param name="metadataResponse"></param>
+        private void UpdateInternalMetadataCache(MetadataResponse metadataResponse)
         {
-            RemoveConnectionToBrokerConnectionIndex(metadata.Brokers);
+            //resolve each broker to BrokerKafkaEndpoint
+            var brokerEndpoints = metadataResponse.Brokers.Select(broker => new BrokerKafkaEndPoint(broker, _kafkaOptions)).ToList();
 
-            //resolve each broker
-            var brokerEndpoints = metadata.Brokers.Select(broker => new
+            //Return connection to _defaultConnectionIndex if metadata does not get it
+            var listToRemove = _brokerConnectionIndex.Keys.Except(brokerEndpoints.Select(x => x.Broker.BrokerId));
+            foreach (var brokerId in listToRemove)
             {
-                Broker = broker,
-                Endpoint = _kafkaOptions.KafkaConnectionFactory.Resolve(broker.Address, _kafkaOptions.Log)
-            });
+                IKafkaConnection connection;
+                if(_brokerConnectionIndex.TryRemove(brokerId, out connection))
+                {
+                    _defaultConnectionIndex.TryAdd(connection.Endpoint, connection);
+                }
+            }
 
             foreach (var broker in brokerEndpoints)
             {
@@ -260,7 +288,8 @@ namespace KafkaNet
                 }
             }
 
-            foreach (var topic in metadata.Topics)
+            //Add Topics to _topicIndex with UtcDateTime
+            foreach (var topic in metadataResponse.Topics)
             {
                 var localTopic = new TopicIndex() { Topic = topic, DateTime = DateTime.UtcNow };
                 _topicIndex.AddOrUpdate(topic.Name, s => localTopic, (s, existing) => localTopic);
@@ -268,24 +297,12 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Remove old connection which is not in the parameters brokers list
+        /// Associate the connection with the broker id, and add or update the reference
         /// </summary>
-        /// <param name="newBrokers"></param>
-        private void RemoveConnectionToBrokerConnectionIndex(IEnumerable<Broker> newBrokers)
-        {
-            var listToRemove = _brokerConnectionIndex.Keys.Except(newBrokers.Select(x => x.BrokerId));
-            foreach (var brokerId in listToRemove)
-            {
-                IKafkaConnection connection;
-                _brokerConnectionIndex.TryRemove(brokerId, out connection);
-                using (connection)
-                { }
-            }
-        }
-
+        /// <param name="brokerId"></param>
+        /// <param name="newConnection"></param>
         private void UpsertConnectionToBrokerConnectionIndex(int brokerId, IKafkaConnection newConnection)
         {
-            //associate the connection with the broker id, and add or update the reference
             _brokerConnectionIndex.AddOrUpdate(brokerId,
                     i => newConnection,
                     (i, existingConnection) =>
@@ -306,6 +323,11 @@ namespace KafkaNet
             _brokerConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
         }
 
+        /// <summary>
+        /// Try to refresh missing metadata cache from <paramref name="topics"/>
+        /// </summary>
+        /// <param name="topics"></param>
+        /// <returns></returns>
         public async Task RefreshMissingTopicMetadata(params string[] topics)
         {
             var topicSearchResult = SearchCacheForTopics(topics, null);
@@ -323,9 +345,13 @@ namespace KafkaNet
         /// </summary>
         /// <param name="topic"></param>
         /// <returns></returns>
-        public DateTime GetTopicMetadataRefreshTime(string topic)
+        public DateTime? GetTopicMetadataRefreshTime(string topic)
         {
-            return _topicIndex[topic].DateTime;
+            TopicIndex topicIndex;
+            if (_topicIndex.TryGetValue(topic, out topicIndex))
+                return topicIndex.DateTime;
+
+            return null;
         }
 
         public IKafkaLog Log
@@ -343,13 +369,26 @@ namespace KafkaNet
 
         private class TopicSearchResult
         {
-            public List<Topic> Topics { get; set; }
+            public List<Topic> Found { get; set; }
             public List<string> Missing { get; set; }
 
             public TopicSearchResult()
             {
-                Topics = new List<Topic>();
+                Found = new List<Topic>();
                 Missing = new List<string>();
+            }
+        }
+
+        private class BrokerKafkaEndPoint
+        {
+            public Broker Broker { get; }
+
+            public KafkaEndpoint Endpoint { get; }
+
+            public BrokerKafkaEndPoint(Broker broker, KafkaOptions options)
+            {
+                Broker = broker;
+                Endpoint = options.KafkaConnectionFactory.Resolve(broker.Address, options.Log);
             }
         }
 
